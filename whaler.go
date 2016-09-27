@@ -1,8 +1,13 @@
 package main
 
+import "io"
 import "os"
 import "fmt"
 import "net"
+import "path"
+import "time"
+import "bufio"
+import "bytes"
 import "errors"
 import "regexp"
 import "os/exec"
@@ -10,9 +15,20 @@ import "runtime"
 import "syscall"
 import "strconv"
 import "strings"
+import "net/http"
+import "io/ioutil"
+import "crypto/md5"
+import "encoding/hex"
 import "github.com/fatih/color"
+import "github.com/nareix/curl"
 import "github.com/fatih/flags"
 import "golang.org/x/crypto/ssh/terminal"
+import "github.com/inconshreveable/go-update"
+
+const NODE_VERSION = "4.2.6"
+
+// Return cursor to start of line and clean it
+const RESET_LINE = "\r\033[K"
 
 func main() {
     var err interface{Error() string} = nil
@@ -35,18 +51,58 @@ func main() {
             os.Args = os.Args[0:1]
         }
 
+        doSetup := false
+
         checkErr := appContainerExists()
         if checkErr != nil {
-            err = createAppContainer()
-            if err == nil {
-                if version == "" {
-                    version = "latest"
-                }
-                err = setupApp("whaler_install", version)
+            if version == "" {
+                version = "latest"
             }
+            doSetup = true
 
         } else if version != "" {
-            err = setupApp("whaler_update", version)
+            doSetup = true
+        }
+
+        if doSetup {
+            if trySelfUpdate() {
+                if selfPath, pathErr := getSelfPath(); pathErr == nil {
+                    if cmd, cmdErr := createCommand(selfPath, os.Args[1:]); cmdErr == nil {
+                        if checkErr == nil {
+                            removeAppContainer()
+                        }
+
+                        cmd.Env = os.Environ()
+                        cmd.Stdin = os.Stdin
+                        cmd.Stdout = os.Stdout
+                        err = cmd.Run()
+
+                        if err != nil {
+                            if msg, ok := err.(*exec.ExitError); ok {
+                                os.Exit(msg.Sys().(syscall.WaitStatus).ExitStatus())
+                            }
+                        }
+                        os.Exit(0)
+                    }
+                }
+            }
+
+            if checkErr != nil {
+                err = createAppContainer()
+            } else {
+                if nodeVersion, errVersion := getContainerNodeVersion(); errVersion == nil {
+                    if os.Getenv("WHALER_NODE_VERSION") != nodeVersion {
+                        err = removeAppContainer()
+                        if err == nil {
+                            err = createAppContainer()
+                        }
+                    }
+                }
+            }
+
+            if err == nil {
+                err = setupApp(version)
+            }
         }
 
         if err == nil {
@@ -61,6 +117,140 @@ func main() {
         }
         os.Exit(1)
     }
+}
+
+func trySelfUpdate() bool {
+    updated := false
+    if selfPath, pathErr := getSelfPath(); pathErr == nil {
+        if md5sum, md5Err := computeMd5(selfPath); md5Err == nil {
+            gitUrl := "https://github.com/whaler/whaler-client/releases/download/"
+
+            fmt.Printf("Please wait...")
+            remoteMd5sum, _ := remoteMd5(gitUrl + runtime.GOOS + "_" + runtime.GOARCH + "/md5")
+            fmt.Printf(RESET_LINE)
+
+            if "" != remoteMd5sum && md5sum != remoteMd5sum {
+                c := askForConfirmation("New version of `whaler-client` available. Download it?", "y")
+                if c {
+                    fmt.Printf("Please wait...")
+                    file := "whaler"
+                    if runtime.GOOS == "windows" {
+                        file = "whaler.exe"
+                    }
+                    err := doUpdate(gitUrl + runtime.GOOS + "_" + runtime.GOARCH + "/" + file)
+                    fmt.Printf(RESET_LINE)
+
+                    if err == nil {
+                        updated = true
+                    }
+                }
+            }
+        }
+    }
+
+    return updated
+}
+
+func getSelfPath() (string, error) {
+    if path.IsAbs(os.Args[0]) {
+        return os.Args[0], nil
+    }
+    wd, err := os.Getwd()
+    return path.Join(wd, os.Args[0]), err
+}
+
+func computeMd5(filePath string) (string, error) {
+    file, err := os.Open(filePath)
+    if err != nil {
+        return "", err
+    }
+    defer file.Close()
+
+    var result []byte
+
+    hash := md5.New()
+    if _, err := io.Copy(hash, file); err != nil {
+        return "", err
+    }
+
+    return hex.EncodeToString(hash.Sum(result)), nil
+}
+
+func remoteMd5(url string) (string, error) {
+    resp, err := http.Get(url)
+    if err != nil {
+        return "", err
+    }
+    defer resp.Body.Close()
+
+    body, err := ioutil.ReadAll(resp.Body)
+    if err != nil  {
+        return "", err
+    }
+
+    s := strings.Split(string(body[:]), " = ")
+
+    if len(s) == 2 {
+        return strings.TrimSpace(s[1]), nil
+    }
+
+    return "", nil
+}
+
+func askForConfirmation(msg string, onEmpty string) bool {
+    reader := bufio.NewReader(os.Stdin)
+
+    if onEmpty != "n" {
+        onEmpty = "y"
+    }
+
+    for {
+        if onEmpty == "n" {
+            fmt.Printf("%s [y/N]: ", msg)
+        } else {
+            fmt.Printf("%s [Y/n]: ", msg)
+        }
+
+        response, _ := reader.ReadString('\n')
+        response = strings.ToLower(strings.TrimSpace(response))
+        fmt.Printf("\033[1A")
+        fmt.Printf(RESET_LINE)
+
+        if response == "" {
+            response = onEmpty
+        }
+
+        if response == "y" || response == "yes" {
+            return true
+        } else if response == "n" || response == "no" {
+            return false
+        }
+    }
+}
+
+func doUpdate(url string) error {
+    req := curl.New(url)
+
+    req.Progress(func (p curl.ProgressStatus) {
+        if p.Size > 0 {
+            fmt.Printf(RESET_LINE + "Downloading...[%s/%s]", curl.PrettySizeString(p.Size), curl.PrettySizeString(p.ContentLength))
+        }
+    }, time.Second)
+
+    resp, err := req.Do()
+    if err != nil {
+        return err
+    }
+
+    if 200 == resp.StatusCode {
+        body := bytes.NewReader([]byte(resp.Body))
+
+        err = update.Apply(body, update.Options{})
+    } else {
+        err = errors.New(strconv.Itoa(resp.StatusCode));
+    }
+
+    return err
 }
 
 func createCommand(name string, args []string) (*exec.Cmd, error) {
@@ -94,11 +284,43 @@ func convertWindowsToUnixPath(path string) string {
     return "/" + path
 }
 
+func getContainerNodeVersion() (string, error) {
+    args := []string{"run", "-t", "--rm",
+    "--volumes-from", "whaler", 
+    "node:" + os.Getenv("WHALER_NODE_VERSION"),
+    "node", "-v"}
+    cmd, err := docker(args)
+    out := ""
+    if err == nil {
+        cmd.Stderr = nil
+        var result []byte
+        result, err = cmd.Output()
+
+        if err == nil {
+            out = strings.TrimSpace(string(result[1:]))
+        }
+    }
+ 
+    return out, err
+}
+
 func prepareAppEnv() error {
+    if os.Getenv("WHALER_NODE_VERSION") == "" {
+        os.Setenv("WHALER_NODE_VERSION", NODE_VERSION)
+    }
+
     if runtime.GOOS == "windows" {
         PWD, _ := os.Getwd()
         os.Setenv("PWD", convertWindowsToUnixPath(PWD))
         os.Setenv("HOME", convertWindowsToUnixPath(os.Getenv("USERPROFILE")))
+    }
+
+    if os.Getenv("PWD") == "" {
+        return errors.New("\nRequired `PWD` enviroment variable are missing.\n");
+    }
+
+    if os.Getenv("HOME") == "" {
+        return errors.New("\nRequired `HOME` enviroment variable are missing.\n");
     }
 
     if os.Getenv("DOCKER_MACHINE_NAME") != "" {
@@ -171,6 +393,18 @@ func prepareDockerMachine(name string) error {
     return nil
 }
 
+func removeAppContainer() error {
+    args := []string{"rm", "-f", "whaler"}
+
+    cmd, err := docker(args)
+    if err != nil {
+        return err
+    }
+    err = cmd.Run()
+
+    return err
+}
+
 func createAppContainer() error {
     if os.Getenv("DOCKER_MACHINE_NAME") != "" {
         err := prepareDockerMachine(os.Getenv("DOCKER_MACHINE_NAME"))
@@ -191,27 +425,27 @@ func createAppContainer() error {
         args = append(args, "-v", "/mnt/sda1:/mnt/sda1")
     }
 
-    args = append(args, "node:4.2")
+    args = append(args, "node:" + os.Getenv("WHALER_NODE_VERSION"))
 
     cmd, err := docker(args)
     if err != nil {
         return err
     }
-    cmd.Stdout = os.Stdout
+    //cmd.Stdout = os.Stdout
     err = cmd.Run()
 
     return err
 }
 
-func setupApp(name string, version string) error {
-    args := []string{"run", "--name", name, "-t", "--rm",
+func setupApp(version string) error {
+    args := []string{"run", "--name", "whaler_setup", "-t", "--rm",
     "--volumes-from", "whaler"}
 
     if version == "dev" {
-        args = append(args, "-e", "WHALER_SETUP=dev", "node:4.2")
+        args = append(args, "-e", "WHALER_SETUP=dev", "node:" + os.Getenv("WHALER_NODE_VERSION"))
         args = append(args, "npm", "install", "-g", "https://github.com/whaler/whaler.git")
     } else {
-        args = append(args, "node:4.2")
+        args = append(args, "node:" + os.Getenv("WHALER_NODE_VERSION"))
         args = append(args, "npm", "install", "-g", "whaler@" + version)
     }
 
@@ -290,7 +524,7 @@ func runApp() error {
         args = append(args, "-t", "--rm")
     }
 
-    args = append(args, "node:4.2", "whaler")
+    args = append(args, "node:" + os.Getenv("WHALER_NODE_VERSION"), "whaler")
 
     cmdArgs := os.Args[1:]
     if runtime.GOOS == "windows" && len(cmdArgs) == 0 {
