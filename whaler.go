@@ -4,7 +4,6 @@ import "io"
 import "os"
 import "fmt"
 import "net"
-import "path"
 import "time"
 import "bufio"
 import "bytes"
@@ -22,6 +21,7 @@ import "encoding/hex"
 import "github.com/fatih/color"
 import "github.com/nareix/curl"
 import "github.com/fatih/flags"
+import "github.com/kardianos/osext"
 import "golang.org/x/crypto/ssh/terminal"
 import "github.com/inconshreveable/go-update"
 
@@ -152,11 +152,8 @@ func trySelfUpdate() bool {
 }
 
 func getSelfPath() (string, error) {
-    if path.IsAbs(os.Args[0]) {
-        return os.Args[0], nil
-    }
-    wd, err := os.Getwd()
-    return path.Join(wd, os.Args[0]), err
+    filename, err := osext.Executable()
+    return filename, err
 }
 
 func computeMd5(filePath string) (string, error) {
