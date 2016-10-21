@@ -25,7 +25,7 @@ import "github.com/fatih/flags"
 import "golang.org/x/crypto/ssh/terminal"
 import "github.com/inconshreveable/go-update"
 
-const NODE_VERSION = "4.2.6"
+const NODE_VERSION = "6.9.1"
 
 // Return cursor to start of line and clean it
 const RESET_LINE = "\r\033[K"
@@ -309,6 +309,10 @@ func prepareAppEnv() error {
         os.Setenv("WHALER_NODE_VERSION", NODE_VERSION)
     }
 
+    if os.Getenv("WHALER_BIN") == "" {
+        os.Setenv("WHALER_BIN", "whaler")
+    }
+
     if runtime.GOOS == "windows" {
         PWD, _ := os.Getwd()
         os.Setenv("PWD", convertWindowsToUnixPath(PWD))
@@ -519,16 +523,19 @@ func runApp() error {
         args = append(args, "-e", "WHALER_FRONTEND=" + frontend)
 
         if frontend == "interactive" {
-            args = append(args, "-i")
+            args = append(args, "-it")
         }
-        args = append(args, "-t", "--rm")
+        args = append(args, "--rm")
     }
 
-    args = append(args, "node:" + os.Getenv("WHALER_NODE_VERSION"), "whaler")
+    args = append(args, "node:" + os.Getenv("WHALER_NODE_VERSION"), os.Getenv("WHALER_BIN"))
 
     cmdArgs := os.Args[1:]
-    if runtime.GOOS == "windows" && len(cmdArgs) == 0 {
-        cmdArgs = append(cmdArgs, "-h")
+
+    if os.Getenv("WHALER_BIN") == "whaler" {
+        if runtime.GOOS == "windows" && len(cmdArgs) == 0 {
+            cmdArgs = append(cmdArgs, "-h")
+        }
     }
 
     args = append(args, cmdArgs...)
