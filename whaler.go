@@ -27,15 +27,30 @@ import "github.com/inconshreveable/go-update"
 
 const NODE_VERSION = "6.9.1"
 
+const DOWNLOAD_URL = "https://github.com/whaler/whaler-client/releases/download/"
+
 // Return cursor to start of line and clean it
 const RESET_LINE = "\r\033[K"
 
 func main() {
     var err interface{Error() string} = nil
 
+    nodeVersion := os.Getenv("WHALER_NODE_VERSION")
+
     err = prepareAppEnv()
 
     if err == nil {
+        if len(os.Args[1:]) > 0 && os.Args[1] == "self-update" {
+            _, permissionsErr := makeSelfUpdate()
+            if permissionsErr != nil {
+                if runtime.GOOS == "windows" {
+                    printErrorAndExit(permissionsErr)
+                }
+                sudoSelfUpdate()
+            }
+            os.Exit(0)
+        }
+
         version := ""
         if len(os.Args[1:]) > 0 && os.Args[1] == "setup" {
             arr := os.Args[1:]
@@ -65,12 +80,25 @@ func main() {
         }
 
         if doSetup {
-            if trySelfUpdate() {
+            updated, permissionsErr := trySelfUpdate()
+
+            if permissionsErr != nil {
+                if runtime.GOOS == "windows" {
+                    printErrorAndExit(permissionsErr)
+                }
+
+                sudoSelfUpdate()
+                updated = true
+            }
+
+            if updated {
                 if selfPath, pathErr := getSelfPath(); pathErr == nil {
                     if cmd, cmdErr := createCommand(selfPath, os.Args[1:]); cmdErr == nil {
                         if checkErr == nil {
                             removeAppContainer()
                         }
+
+                        os.Setenv("WHALER_NODE_VERSION", nodeVersion)
 
                         cmd.Env = os.Environ()
                         cmd.Stdin = os.Stdin
@@ -111,44 +139,87 @@ func main() {
     }
 
     if err != nil {
-        if len(err.Error()) > 0 {
-            red := color.New(color.FgRed).SprintFunc()
-            fmt.Fprintf(os.Stderr, red("%v\n"), err)
-        }
-        os.Exit(1)
+        printErrorAndExit(err)
     }
 }
 
-func trySelfUpdate() bool {
+func printErrorAndExit(err error) {
+    if len(err.Error()) > 0 {
+        red := color.New(color.FgRed).SprintFunc()
+        fmt.Fprintf(os.Stderr, red("%v\n"), err)
+    }
+    os.Exit(1)
+}
+
+func sudoSelfUpdate() {
+    if selfPath, pathErr := getSelfPath(); pathErr == nil {
+        args := []string{"-E", selfPath, "self-update"}
+        cmd, cmdErr := createCommand("sudo", args)
+
+        if cmdErr != nil {
+            printErrorAndExit(cmdErr)
+        }
+
+        cmd.Env = os.Environ()
+        cmd.Stdin = os.Stdin
+        cmd.Stdout = os.Stdout
+        err := cmd.Run()
+
+        if err != nil {
+            printErrorAndExit(err)
+        }
+    }
+}
+
+func makeSelfUpdate() (bool, error) {
     updated := false
+
+    updateOpts := update.Options{}
+
+    if permissionsErr := updateOpts.CheckPermissions(); permissionsErr != nil {
+        return false, permissionsErr
+    }
+
+    fmt.Printf("Please wait...")
+    file := "whaler"
+    if runtime.GOOS == "windows" {
+        file = "whaler.exe"
+    }
+    err := doUpdate(DOWNLOAD_URL + runtime.GOOS + "_" + runtime.GOARCH + "/" + file)
+    fmt.Printf(RESET_LINE)
+
+    if err == nil {
+        updated = true
+    }
+
+    return updated, nil
+}
+
+func trySelfUpdate() (bool, error) {
+    var permissionsErr interface{Error() string} = nil
+
+    updated := false
+
     if selfPath, pathErr := getSelfPath(); pathErr == nil {
         if md5sum, md5Err := computeMd5(selfPath); md5Err == nil {
-            gitUrl := "https://github.com/whaler/whaler-client/releases/download/"
 
             fmt.Printf("Please wait...")
-            remoteMd5sum, _ := remoteMd5(gitUrl + runtime.GOOS + "_" + runtime.GOARCH + "/md5")
+            remoteMd5sum, _ := remoteMd5(DOWNLOAD_URL + runtime.GOOS + "_" + runtime.GOARCH + "/md5")
             fmt.Printf(RESET_LINE)
 
             if "" != remoteMd5sum && md5sum != remoteMd5sum {
                 c := askForConfirmation("New version of `whaler-client` available. Download it?", "y")
                 if c {
-                    fmt.Printf("Please wait...")
-                    file := "whaler"
-                    if runtime.GOOS == "windows" {
-                        file = "whaler.exe"
-                    }
-                    err := doUpdate(gitUrl + runtime.GOOS + "_" + runtime.GOARCH + "/" + file)
-                    fmt.Printf(RESET_LINE)
-
-                    if err == nil {
-                        updated = true
+                    updated, permissionsErr = makeSelfUpdate()
+                    if permissionsErr != nil {
+                        return false, permissionsErr
                     }
                 }
             }
         }
     }
 
-    return updated
+    return updated, nil
 }
 
 func getSelfPath() (string, error) {
