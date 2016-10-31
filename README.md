@@ -10,7 +10,7 @@ Client for [Whaler](https://github.com/whaler/whaler)
 $ docker run -it --rm -v $HOME:$HOME -w `pwd` -e GOOS=linux golang:1.6 ./build.sh
 ```
 
-### Darwin/OSX 64bit
+### Darwin/macOS 64bit
 
 ```sh
 $ docker run -it --rm -v $HOME:$HOME -w `pwd` -e GOOS=darwin golang:1.6 ./build.sh

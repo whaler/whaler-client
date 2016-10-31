@@ -17,6 +17,11 @@ go get github.com/fatih/flags
 go get github.com/kardianos/osext
 go get golang.org/x/crypto/ssh/terminal
 go get github.com/inconshreveable/go-update
-go build -o "$DIR/$FILE" whaler.go
+
+if [ "linux" = "$GOOS" ]; then
+    CGO_ENABLED=0 go build -a -installsuffix cgo -o "$DIR/$FILE" whaler.go
+else
+    go build -o "$DIR/$FILE" whaler.go
+fi
 
 md5sum --tag "$DIR/$FILE" > "$DIR/md5"
