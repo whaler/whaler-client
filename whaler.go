@@ -30,7 +30,7 @@ const NODE_VERSION = "6.9.1"
 const DOWNLOAD_URL = "https://github.com/whaler/whaler-client/releases/download/"
 
 // Return cursor to start of line and clean it
-const RESET_LINE = "\r\033[K"
+const RESET_LINE = "\r\033[K\r"
 
 func main() {
     var err interface{Error() string} = nil
@@ -281,7 +281,7 @@ func askForConfirmation(msg string, onEmpty string) bool {
 
         response, _ := reader.ReadString('\n')
         response = strings.ToLower(strings.TrimSpace(response))
-        fmt.Printf("\033[1A")
+        fmt.Printf("\033[1A") // Move up 1 line
         fmt.Printf(RESET_LINE)
 
         if response == "" {
@@ -299,9 +299,16 @@ func askForConfirmation(msg string, onEmpty string) bool {
 func doUpdate(url string) error {
     req := curl.New(url)
 
+    msgLen := 0
     req.Progress(func (p curl.ProgressStatus) {
         if p.Size > 0 {
-            fmt.Printf(RESET_LINE + "Downloading...[%s/%s]", curl.PrettySizeString(p.Size), curl.PrettySizeString(p.ContentLength))
+            fmt.Printf(RESET_LINE)
+            msg := fmt.Sprintf("Downloading...[%s/%s]", curl.PrettySizeString(p.Size), curl.PrettySizeString(p.ContentLength))
+            if runtime.GOOS == "windows" {
+                fmt.Printf("%s\r", strings.Repeat(" ", msgLen))
+                msgLen = len(msg)
+            }
+            fmt.Printf(msg)
         }
     }, time.Second)
 
@@ -315,7 +322,7 @@ func doUpdate(url string) error {
 
         err = update.Apply(body, update.Options{})
     } else {
-        err = errors.New(strconv.Itoa(resp.StatusCode));
+        err = errors.New(strconv.Itoa(resp.StatusCode))
     }
 
     return err
@@ -388,11 +395,11 @@ func prepareAppEnv() error {
     }
 
     if os.Getenv("PWD") == "" {
-        return errors.New("\nRequired `PWD` enviroment variable are missing.\n");
+        return errors.New("\nRequired `PWD` enviroment variable are missing.\n")
     }
 
     if os.Getenv("HOME") == "" {
-        return errors.New("\nRequired `HOME` enviroment variable are missing.\n");
+        return errors.New("\nRequired `HOME` enviroment variable are missing.\n")
     }
 
     if os.Getenv("DOCKER_MACHINE_NAME") != "" {
@@ -503,7 +510,7 @@ func createAppContainer() error {
     if err != nil {
         return err
     }
-    //cmd.Stdout = os.Stdout
+    cmd.Stdout = os.Stdout
     err = cmd.Run()
 
     return err
