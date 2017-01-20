@@ -144,10 +144,15 @@ func main() {
 }
 
 func printErrorAndExit(err error) {
+    if msg, ok := err.(*exec.ExitError); ok {
+        os.Exit(msg.Sys().(syscall.WaitStatus).ExitStatus())
+    }
+
     if len(err.Error()) > 0 {
         red := color.New(color.FgRed).SprintFunc()
         fmt.Fprintf(os.Stderr, red("%v\n"), err)
     }
+
     os.Exit(1)
 }
 
@@ -566,6 +571,8 @@ func runApp() error {
     }
 
     daemon := ""
+    detach := ""
+
     if len(os.Args[1:]) > 0 && os.Args[1] == "daemon" {
         arr := os.Args[1:]
         if !(flags.Has("-h", arr) || flags.Has("--help", arr)) {
@@ -578,17 +585,24 @@ func runApp() error {
                 daemon = "1337"
             }
         }
+    } else if os.Getenv("WHALER_DETACH") != "" {
+        detach = os.Getenv("WHALER_DETACH")
     }
 
-    if daemon != "" {
+    if daemon != "" || detach != "" {
         args = append(args, "-e", "WHALER_DAEMON_APPS=" + os.Getenv("HOME") + "/apps")
         args = append(args, "-v", os.Getenv("HOME") + "/apps" + ":" + "/root/apps")
 
         args = append(args, "-w", "/root/apps")
-        args = append(args, "--name", "whaler_daemon_" + strconv.Itoa(syscall.Getpid()))
-
         args = append(args, "-d", "--restart", "always")
-        args = append(args, "-p", daemon + ":" + daemon)
+
+        if detach != "" {
+            args = append(args, "--name", detach)
+
+        } else {
+            args = append(args, "--name", "whaler_daemon_" + strconv.Itoa(syscall.Getpid()))
+            args = append(args, "-p", daemon + ":" + daemon)
+        }
 
     } else {
         args = append(args, "-w", os.Getenv("PWD"))
