@@ -489,6 +489,22 @@ func removeAppContainer() error {
     return err
 }
 
+func createWhalerDir(path string) error {
+    args := []string{"run", "--rm",
+    "-v", path + ":/.whaler_tmp",
+    "node:" + os.Getenv("WHALER_NODE_VERSION"),
+    "mkdir", "-p", "/.whaler_tmp/whaler"}
+
+    cmd, err := docker(args)
+    if err != nil {
+        return err
+    }
+    //cmd.Stdout = os.Stdout
+    err = cmd.Run()
+
+    return err
+}
+
 func createAppContainer() error {
     if os.Getenv("DOCKER_MACHINE_NAME") != "" {
         err := prepareDockerMachine(os.Getenv("DOCKER_MACHINE_NAME"))
@@ -497,10 +513,19 @@ func createAppContainer() error {
         }
     }
 
+    etcWhaler := "/etc/whaler:/etc/whaler";
+    if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
+        etcWhaler = "/etc/whaler";
+    } else {
+        createWhalerDir("/etc");
+    }
+
+    createWhalerDir("/var/lib");
+
     args := []string{"create", "--name", "whaler",
     "-v", "/usr/local/bin",
     "-v", "/usr/local/lib/node_modules",
-    "-v", "/etc/whaler:/etc/whaler",
+    "-v", etcWhaler,
     "-v", "/var/lib/whaler:/var/lib/whaler",
     "-v", "/var/lib/docker:/var/lib/docker",
     "-v", "/var/run/docker.sock:/var/run/docker.sock"}
