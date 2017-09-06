@@ -21,6 +21,7 @@ import "encoding/hex"
 import "github.com/fatih/color"
 import "github.com/nareix/curl"
 import "github.com/fatih/flags"
+import "github.com/Jeffail/gabs"
 import "github.com/kardianos/osext"
 import "golang.org/x/crypto/ssh/terminal"
 import "github.com/inconshreveable/go-update"
@@ -586,6 +587,23 @@ func runApp() error {
     "--volumes-from", "whaler",
     "-v", os.Getenv("HOME") + ":" + os.Getenv("HOME"),
     "-v", os.Getenv("HOME") + "/.whaler" + ":" + "/root/.whaler"}
+
+    content, readErr := ioutil.ReadFile(os.Getenv("HOME") + "/.whaler/client.json")
+    if readErr == nil {
+        parsed, parseErr := gabs.ParseJSON(content)
+        if parseErr != nil {
+            return parseErr
+        }
+
+        children, _ := parsed.S("file-sharing").Children()
+        for _, child := range children {
+            sharedVol := child.Data().(string)
+            if runtime.GOOS == "windows" {
+                sharedVol = convertWindowsToUnixPath(sharedVol)
+            }
+            args = append(args, "-v", sharedVol + ":" + sharedVol)
+        }
+    }
 
     if os.Getenv("WHALER_PATH") != "" {
         args = append(args, "-v", os.Getenv("WHALER_PATH") + ":" + "/usr/local/lib/node_modules/whaler")

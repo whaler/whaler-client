@@ -14,6 +14,7 @@ fi
 go get github.com/fatih/color
 go get github.com/nareix/curl
 go get github.com/fatih/flags
+go get github.com/Jeffail/gabs
 go get github.com/kardianos/osext
 go get golang.org/x/crypto/ssh/terminal
 go get github.com/inconshreveable/go-update
