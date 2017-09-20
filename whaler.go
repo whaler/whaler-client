@@ -408,6 +408,10 @@ func prepareAppEnv() error {
         return errors.New("\nRequired `HOME` enviroment variable are missing.\n")
     }
 
+    if os.Getenv("WHALER_HOME") == "" {
+        os.Setenv("WHALER_HOME", os.Getenv("HOME"))
+    }
+
     if os.Getenv("DOCKER_MACHINE_NAME") != "" {
         args := []string{"env", os.Getenv("DOCKER_MACHINE_NAME")}
         cmd, err := dockerMachine(args)
@@ -585,8 +589,9 @@ func runApp() error {
     args := []string{"run",
     "--pid", "host",
     "--volumes-from", "whaler",
+    "-e", "HOME=" + os.Getenv("WHALER_HOME"),
     "-v", os.Getenv("HOME") + ":" + os.Getenv("HOME"),
-    "-v", os.Getenv("HOME") + "/.whaler" + ":" + "/root/.whaler"}
+    "-v", os.Getenv("HOME") + "/.whaler" + ":" + os.Getenv("WHALER_HOME") + "/.whaler"}
 
     content, readErr := ioutil.ReadFile(os.Getenv("HOME") + "/.whaler/client.json")
     if readErr == nil {
@@ -634,9 +639,9 @@ func runApp() error {
 
     if daemon != "" || detach != "" {
         args = append(args, "-e", "WHALER_DAEMON_APPS=" + os.Getenv("HOME") + "/apps")
-        args = append(args, "-v", os.Getenv("HOME") + "/apps" + ":" + "/root/apps")
+        args = append(args, "-v", os.Getenv("HOME") + "/apps" + ":" + os.Getenv("WHALER_HOME") + "/apps")
 
-        args = append(args, "-w", "/root/apps")
+        args = append(args, "-w", os.Getenv("WHALER_HOME") + "/apps")
         args = append(args, "-d", "--restart", "always")
 
         if detach != "" {
