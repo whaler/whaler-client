@@ -94,7 +94,11 @@ func main() {
 
             if updated {
                 if selfPath, pathErr := getSelfPath(); pathErr == nil {
-                    if cmd, cmdErr := createCommand(selfPath, os.Args[1:]); cmdErr == nil {
+                    args := os.Args[1:]
+                    if len(args) == 0 && version != "" {
+                        args = append(args, "setup", "--version", version)
+                    }
+                    if cmd, cmdErr := createCommand(selfPath, args); cmdErr == nil {
                         if checkErr == nil {
                             removeAppContainer()
                         }
