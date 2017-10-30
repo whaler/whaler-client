@@ -514,6 +514,32 @@ func createWhalerDir(path string) error {
     return err
 }
 
+func createWhalerNetwork() error {
+    args := []string{"network", "create", "whaler_nw"}
+
+    cmd, err := docker(args)
+    if err != nil {
+        return err
+    }
+    cmd.Stderr = nil
+    err = cmd.Run()
+
+    return err
+}
+
+func inspectWhalerNetwork() error {
+    args := []string{"network", "inspect", "whaler_nw"}
+
+    cmd, err := docker(args)
+    if err != nil {
+        return err
+    }
+    cmd.Stderr = nil
+    err = cmd.Run()
+
+    return err
+}
+
 func createAppContainer() error {
     if os.Getenv("DOCKER_MACHINE_NAME") != "" {
         err := prepareDockerMachine(os.Getenv("DOCKER_MACHINE_NAME"))
@@ -667,6 +693,16 @@ func runApp() error {
             args = append(args, "-it")
         }
         args = append(args, "--rm")
+    }
+
+    useWhalerNetwork := false
+    if err := inspectWhalerNetwork(); err == nil {
+        useWhalerNetwork = true
+    } else if err := createWhalerNetwork(); err == nil {
+        useWhalerNetwork = true
+    }
+    if useWhalerNetwork {
+        args = append(args, "--network", "whaler_nw")
     }
 
     args = append(args, "node:" + os.Getenv("WHALER_NODE_VERSION"), os.Getenv("WHALER_BIN"))
