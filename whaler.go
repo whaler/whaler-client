@@ -587,11 +587,12 @@ func setupApp(version string) error {
 
     if version == "dev" {
         args = append(args, "-e", "WHALER_SETUP=dev", "node:" + os.Getenv("WHALER_NODE_VERSION"))
-        args = append(args, "npm", "install", "-g", "https://github.com/whaler/whaler.git")
+        args = append(args, "npm", "install", "https://github.com/whaler/whaler.git")
     } else {
         args = append(args, "node:" + os.Getenv("WHALER_NODE_VERSION"))
-        args = append(args, "npm", "install", "-g", "whaler@" + version)
+        args = append(args, "npm", "install", "whaler@" + version)
     }
+    args = append(args, "--global", "--unsafe-perm", "--loglevel=error")
 
     cmd, err := docker(args)
     if err != nil {
