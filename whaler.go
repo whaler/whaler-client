@@ -369,6 +369,28 @@ func convertWindowsToUnixPath(path string) string {
     return "/" + path
 }
 
+func isNodeImageExists() (bool, error) {
+    exists := false
+
+    args := []string{"images", "-q",
+    "node:" + os.Getenv("WHALER_NODE_VERSION")}
+    cmd, err := docker(args)
+    if err == nil {
+        cmd.Stderr = nil
+        var result []byte
+        result, err = cmd.Output()
+
+        if err == nil {
+            out := strings.TrimSpace(string(result))
+            if out != "" {
+                exists = true
+            }
+        }
+    }
+
+    return exists, err
+}
+
 func getContainerNodeVersion() (string, error) {
     args := []string{"run", "-t", "--rm",
     "--volumes-from", "whaler", 
@@ -508,7 +530,14 @@ func createWhalerDir(path string) error {
     if err != nil {
         return err
     }
-    //cmd.Stdout = os.Stdout
+
+    if exists, err := isNodeImageExists(); err == nil {
+        if exists {
+            // ignore stdout
+        } else {
+            cmd.Stdout = os.Stdout
+        }
+    }
     err = cmd.Run()
 
     return err
