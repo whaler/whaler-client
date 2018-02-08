@@ -26,7 +26,7 @@ import "github.com/kardianos/osext"
 import "golang.org/x/crypto/ssh/terminal"
 import "github.com/inconshreveable/go-update"
 
-const NODE_VERSION = "6.9.1"
+const NODE_VERSION = "8.9.4"
 
 const DOWNLOAD_URL = "https://github.com/whaler/whaler-client/releases/download/"
 
