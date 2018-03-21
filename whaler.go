@@ -391,7 +391,27 @@ func isNodeImageExists() (bool, error) {
     return exists, err
 }
 
+func pullNodeImageIfNotExists() error {
+    if exists, err := isNodeImageExists(); err == nil {
+        if false == exists {
+            args := []string{"pull", "node:" + os.Getenv("WHALER_NODE_VERSION")}
+
+            cmd, err := docker(args)
+            if err != nil {
+                return err
+            }
+            cmd.Stdout = os.Stdout
+
+            return cmd.Run()
+        }
+    }
+
+    return nil
+}
+
 func getContainerNodeVersion() (string, error) {
+    pullNodeImageIfNotExists()
+
     args := []string{"run", "-t", "--rm",
     "--volumes-from", "whaler", 
     "node:" + os.Getenv("WHALER_NODE_VERSION"),
@@ -531,16 +551,7 @@ func createWhalerDir(path string) error {
         return err
     }
 
-    if exists, err := isNodeImageExists(); err == nil {
-        if exists {
-            // ignore stdout
-        } else {
-            cmd.Stdout = os.Stdout
-        }
-    }
-    err = cmd.Run()
-
-    return err
+    return cmd.Run()
 }
 
 func createWhalerNetwork() error {
@@ -577,14 +588,16 @@ func createAppContainer() error {
         }
     }
 
-    etcWhaler := "/etc/whaler:/etc/whaler";
+    pullNodeImageIfNotExists()
+
+    etcWhaler := "/etc/whaler:/etc/whaler"
     if runtime.GOOS == "darwin" || runtime.GOOS == "windows" {
-        etcWhaler = "/etc/whaler";
+        etcWhaler = "/etc/whaler"
     } else {
-        createWhalerDir("/etc");
+        createWhalerDir("/etc")
     }
 
-    createWhalerDir("/var/lib");
+    createWhalerDir("/var/lib")
 
     args := []string{"create", "--name", "whaler",
     "-v", "/usr/local/bin",
