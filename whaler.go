@@ -16,6 +16,7 @@ import "strconv"
 import "strings"
 import "net/http"
 import "io/ioutil"
+import "os/signal"
 import "crypto/md5"
 import "encoding/hex"
 import "github.com/fatih/color"
@@ -710,6 +711,7 @@ func runApp() error {
         detach = os.Getenv("WHALER_DETACH")
     }
 
+    containerName := ""
     if daemon != "" || detach != "" {
         args = append(args, "-e", "WHALER_DAEMON_APPS=" + os.Getenv("HOME") + "/apps")
         args = append(args, "-v", os.Getenv("HOME") + "/apps" + ":" + os.Getenv("WHALER_HOME") + "/apps")
@@ -726,8 +728,9 @@ func runApp() error {
         }
 
     } else {
+        containerName = "whaler_" + strconv.Itoa(syscall.Getpid())
         args = append(args, "-w", os.Getenv("PWD"))
-        args = append(args, "--name", "whaler_" + strconv.Itoa(syscall.Getpid()))
+        args = append(args, "--name", containerName)
 
         frontend := getAppFrontend()
         args = append(args, "-e", "WHALER_FRONTEND=" + frontend)
@@ -764,9 +767,29 @@ func runApp() error {
     if err != nil {
         return err
     }
+
+    if containerName != "" {
+        killAppHandle(containerName)
+    }
+
     cmd.Stdin = os.Stdin
     cmd.Stdout = os.Stdout
     err = cmd.Run()
 
     return err
+}
+
+func killAppHandle(name string) {
+    c := make(chan os.Signal, 1)
+    signal.Notify(c, os.Interrupt, syscall.SIGHUP)
+    go func() {
+        <-c
+        for {
+            args := []string{"kill", "--signal", "SIGHUP", name}
+            if cmd, err := docker(args); err == nil {
+                cmd.Stderr = nil
+                cmd.CombinedOutput()
+            }
+        }
+    }()
 }
