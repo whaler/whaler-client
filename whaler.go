@@ -27,7 +27,7 @@ import "github.com/kardianos/osext"
 import "golang.org/x/crypto/ssh/terminal"
 import "github.com/inconshreveable/go-update"
 
-const NODE_VERSION = "8.9.4"
+const NODE_VERSION = "10.16.0"
 
 const DOWNLOAD_URL = "https://github.com/whaler/whaler-client/releases/download/"
 
@@ -601,6 +601,8 @@ func createAppContainer() error {
     createWhalerDir("/var/lib")
 
     args := []string{"create", "--name", "whaler",
+    "-v", "/.npm",
+    "-v", "/.node-gyp",
     "-v", "/usr/local/bin",
     "-v", "/usr/local/lib/node_modules",
     "-v", etcWhaler,
@@ -627,6 +629,9 @@ func createAppContainer() error {
 func setupApp(version string) error {
     args := []string{"run", "--name", "whaler_setup", "-t", "--rm",
     "--volumes-from", "whaler"}
+
+    args = append(args, "-e", "NPM_CONFIG_CACHE=/.npm")
+    args = append(args, "-e", "NPM_CONFIG_DEVDIR=/.node-gyp")
 
     if version == "dev" {
         args = append(args, "-e", "WHALER_SETUP=dev", "node:" + os.Getenv("WHALER_NODE_VERSION"))
@@ -663,6 +668,8 @@ func runApp() error {
     args := []string{"run",
     "--pid", "host",
     "--volumes-from", "whaler",
+    "-e", "NPM_CONFIG_CACHE=/.npm",
+    "-e", "NPM_CONFIG_DEVDIR=/.node-gyp",
     "-e", "HOME=" + os.Getenv("WHALER_HOME"),
     "-v", os.Getenv("HOME") + ":" + os.Getenv("HOME"),
     "-v", os.Getenv("HOME") + "/.whaler" + ":" + os.Getenv("WHALER_HOME") + "/.whaler"}

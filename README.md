@@ -19,19 +19,19 @@ By default `client` provide access for `HOME` directory. If you need access for 
 ### Linux 64bit
 
 ```sh
-$ docker run -it --rm -v $HOME:$HOME -w `pwd` -e GOOS=linux golang:1.9 ./build.sh
+$ docker run -it --rm -v $HOME:$HOME -w `pwd` -e GOOS=linux golang:1.12 ./build.sh
 ```
 
 ### Darwin/macOS 64bit
 
 ```sh
-$ docker run -it --rm -v $HOME:$HOME -w `pwd` -e GOOS=darwin golang:1.9 ./build.sh
+$ docker run -it --rm -v $HOME:$HOME -w `pwd` -e GOOS=darwin golang:1.12 ./build.sh
 ```
 
 ### Windows 64bit
 
 ```sh
-$ docker run -it --rm -v $HOME:$HOME -w `pwd` -e GOOS=windows golang:1.9 ./build.sh
+$ docker run -it --rm -v $HOME:$HOME -w `pwd` -e GOOS=windows golang:1.12 ./build.sh
 ```
 
 ## License
