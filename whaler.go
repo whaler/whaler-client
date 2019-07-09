@@ -413,10 +413,10 @@ func pullNodeImageIfNotExists() error {
 func getContainerNodeVersion() (string, error) {
     pullNodeImageIfNotExists()
 
-    args := []string{"run", "-t", "--rm",
-    "--volumes-from", "whaler", 
+    args := []string{"run", "-t", "--rm", "--entrypoint=node",
+    "--volumes-from", "whaler",
     "node:" + os.Getenv("WHALER_NODE_VERSION"),
-    "node", "-v"}
+    "-v"}
     cmd, err := docker(args)
     out := ""
     if err == nil {
@@ -530,7 +530,7 @@ func prepareDockerMachine(name string) error {
 }
 
 func removeAppContainer() error {
-    args := []string{"rm", "-f", "whaler"}
+    args := []string{"rm", "-fv", "whaler"}
 
     cmd, err := docker(args)
     if err != nil {
