@@ -27,7 +27,7 @@ import "github.com/kardianos/osext"
 import "golang.org/x/crypto/ssh/terminal"
 import "github.com/inconshreveable/go-update"
 
-const NODE_VERSION = "10.16.0"
+const NODE_VERSION = "14.15.4"
 
 const DOWNLOAD_URL = "https://github.com/whaler/whaler-client/releases/download/"
 
@@ -681,7 +681,7 @@ func runApp() error {
             return parseErr
         }
 
-        children, _ := parsed.S("file-sharing").Children()
+        children := parsed.S("file-sharing").Children()
         for _, child := range children {
             sharedVol := child.Data().(string)
             if runtime.GOOS == "windows" {
