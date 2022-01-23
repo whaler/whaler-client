@@ -4,7 +4,8 @@ Client for [Whaler](https://github.com/whaler/whaler)
 
 ## File Sharing
 
-By default `client` provide access for `HOME` directory. If you need access for different directories, create `~/.whaler/client.json` file with this content:
+By default `client` provide access for `HOME` directory. If you need access for different directories, 
+create `~/.whaler/client.json` file with this content:
 
 ```json
 {
@@ -16,22 +17,8 @@ By default `client` provide access for `HOME` directory. If you need access for 
 
 ## Build
 
-### Linux 64bit
-
 ```sh
-docker run -it --rm -v $HOME:$HOME -w `pwd` -e GOOS=linux golang:1.15 ./build.sh
-```
-
-### Darwin/macOS 64bit
-
-```sh
-docker run -it --rm -v $HOME:$HOME -w `pwd` -e GOOS=darwin golang:1.15 ./build.sh
-```
-
-### Windows 64bit
-
-```sh
-docker run -it --rm -v $HOME:$HOME -w `pwd` -e GOOS=windows golang:1.15 ./build.sh
+docker run -it --rm -v $HOME:$HOME -w `pwd` golang:1.17 ./scripts/make.sh
 ```
 
 ## License
