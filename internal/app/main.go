@@ -245,7 +245,7 @@ func setupApp(version string) error {
 		args = append(args, "node:" + os.Getenv("WHALER_NODE_VERSION"))
 		args = append(args, "npm", "install", "whaler@" + version)
 	}
-	args = append(args, "--global", "--production", "--unsafe-perm", "--no-update-notifier")
+	args = append(args, "--global", "--production", "--unsafe-perm", "--no-update-notifier", "--no-optional")
 
 	cmd, err := docker.Container(args)
 	if err != nil {
