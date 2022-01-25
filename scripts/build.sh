@@ -69,10 +69,11 @@ if [ "YES" = "${ARCHIVE}" ]; then
     cd "${DIR}"
     cp "${WORKDIR}/LICENSE" ./
     cp "${WORKDIR}/README.md" ./
-    TAR_FILE="${WORKDIR}/${BUILD_DIR}/whaler_${GOOS}_${ARCH}.tar.gz"
-    tar -czf "${TAR_FILE}" *
-    md5_sum "${TAR_FILE}" "${TAR_FILE}.md5"
+    TAR_FILE="${BUILD_DIR}/whaler_${GOOS}_${ARCH}.tar.gz"
+    tar -czf "${WORKDIR}/${TAR_FILE}" *
     rm -rf "${WORKDIR}/$( dirname "${DIR}" )"
+    cd "${WORKDIR}"
+    md5_sum "${TAR_FILE}" "${TAR_FILE}.md5"
 fi
 
 echo "${VERSION}-${SHA}" > "${WORKDIR}/${BUILD_DIR}/version"
